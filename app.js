@@ -209,7 +209,7 @@
 
   function contentHtml(tip, mode) {
     var he = "<h3>" + bidi(tip.titleHe) + "</h3><p>" + bidi(tip.summaryHe) + "</p>";
-    var en = '<div class="en"><h3>' + esc(tip.originalTitle) + '</h3><blockquote class="quote">' + esc(tip.originalText) + "</blockquote></div>";
+    var en = '<div class="en">' + (tip.originalTitle ? "<h3>" + esc(tip.originalTitle) + "</h3>" : "") + '<blockquote class="quote">' + esc(tip.originalText) + "</blockquote></div>";
     if (mode === "he") return he;
     if (mode === "orig") return en;
     return '<div class="both"><div><div class="tag-label">עברית</div>' + he + '</div><div><div class="tag-label" dir="ltr">Original</div>' + en + "</div></div>";
@@ -297,7 +297,7 @@
       if (/איך מיישמים|שלב|להתחיל|להתקין/.test(q))
         return 'כדי ליישם את "' + tip.titleHe + '":\n1. פתח את סביבת העבודה שלך ב ' + tip.product + ".\n2. השתמש בפקודה או בתבנית מהכרטיס:\n`" + tip.codeSnippet + "`\n3. נסה קודם על משימה קטנה, ורק אחר כך הכנס לכל הפרויקט.";
       if (/דוגמה|קוד|תבנית/.test(q))
-        return "דוגמה להעתקה:\n`" + tip.codeSnippet + '`\n\nלפי המקור הרשמי (' + tip.sourceName + '): "' + tip.originalTitle + '".';
+        return "דוגמה להעתקה:\n`" + tip.codeSnippet + '`\n\nלפי המקור הרשמי (' + tip.sourceName + ').';
       if (/יתרון|הבדל|למה/.test(q))
         return 'היתרון של "' + tip.titleHe + '":\n• חלון ההקשר נשאר נקי וחוסך טוקנים.\n• תוצאות עקביות יותר בסשנים ארוכים.\n• מבוסס על ההמלצה ב ' + tip.sourceName + ".";
       if (/פשוט|הסבר/.test(q)) return "במילים פשוטות: " + tip.summaryHe;
