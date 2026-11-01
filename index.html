@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>מרכז הטיפים ל Claude</title>
+  <title>מפת הטיפים</title>
   <meta name="description" content="טיפים יומיים על Claude ו Claude Code: סקילים, סוכנים, פקודות ומאגרים">
-  <meta name="theme-color" content="#c2410c" id="meta-theme-color">
+  <meta name="theme-color" content="#f7f6f2" id="meta-theme-color">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -15,7 +15,7 @@
     try {
       var t = localStorage.getItem("claude_tips_hub_theme_v1");
       if (t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t);
-      else if (matchMedia("(prefers-color-scheme: dark)").matches) document.documentElement.setAttribute("data-theme", "dark");
+      else document.documentElement.setAttribute("data-theme", "light");
     } catch (e) {}
   </script>
 </head>
@@ -25,8 +25,8 @@
   <div class="wrap">
     <div class="topbar-row">
       <div class="brand">
-        <div class="brand-mark" aria-hidden="true">CC</div>
-        <h1>מרכז הטיפים ל Claude</h1>
+        <span class="brand-lines" aria-hidden="true"><i></i><i></i><i></i></span>
+        <h1>מפת הטיפים</h1>
       </div>
 
       <div class="search">
@@ -65,8 +65,13 @@
       <button type="button" data-lang="both" aria-pressed="false">שניהם</button>
     </div>
     <span class="grow"></span>
-    <label class="sr-only" for="date-select">תאריך</label>
-    <select id="date-select"></select>
+    <label class="sr-only" for="range-select">טווח זמן</label>
+    <select id="range-select">
+      <option value="7">7 ימים אחרונים</option>
+      <option value="14">14 ימים אחרונים</option>
+      <option value="30">30 ימים אחרונים</option>
+      <option value="0">כל התקופה</option>
+    </select>
     <label class="sr-only" for="product-select">מוצר</label>
     <select id="product-select">
       <option value="all">כל המוצרים</option>

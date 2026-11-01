@@ -1,7 +1,7 @@
 {
   "id": "./",
-  "name": "מרכז הטיפים ל Claude",
-  "short_name": "טיפים ל Claude",
+  "name": "מפת הטיפים",
+  "short_name": "מפת טיפים",
   "description": "טיפים יומיים על Claude ו Claude Code: סקילים, סוכנים, פקודות ומאגרים",
   "start_url": "./index.html",
   "scope": "./",
@@ -9,7 +9,7 @@
   "orientation": "any",
   "dir": "rtl",
   "lang": "he",
-  "background_color": "#faf8f5",
+  "background_color": "#f7f6f2",
   "theme_color": "#c2410c",
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },

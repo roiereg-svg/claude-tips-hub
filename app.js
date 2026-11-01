@@ -9,6 +9,8 @@
     { id: "github", label: "מאגרי GitHub" },
     { id: "general", label: "קלוד כללי" }
   ];
+  var CODES = { features: "CMD", agents: "AGT", skills: "SKL", github: "GIT", general: "GEN", all: "ALL", saved: "SAV" };
+  var MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
   var TAGS = ["ניסיתי ועבד מעולה", "לנסות בהמשך", "שימושי לצוות", "חוסך טוקנים"];
   var KEYS = {
     feedback: "claude_tips_hub_feedback_v1",
@@ -22,10 +24,12 @@
     lang: "he",
     cardLang: {},
     category: "all",
-    date: "all",
+    range: 14,
+    sel: null,
     product: "all",
     query: "",
     openChat: {},
+    openRow: {},
     openReview: {},
     tipChats: {},
     globalChat: [{ role: "ai", text: "שלום! אני מכיר את כל הטיפים באתר. על מה תרצה לדבר?" }],
@@ -45,7 +49,7 @@
 
   // טקסט עברי עם מונחים באנגלית: כל רצף לטיני נעטף ב bdi כדי שלא יתהפך (למשל /btw בסוף כותרת)
   function bidi(raw) {
-    var re = /[\/.]?[A-Za-z][\w\-.\/]*(?:\s+[A-Za-z][\w\-.\/]*)*/g;
+    var re = /(?:--|[\/.@#])?[A-Za-z][\w\-.\/@]*(?:\s+[A-Za-z][\w\-.\/@]*)*/g;
     var out = "", last = 0, m;
     while ((m = re.exec(raw))) {
       out += esc(raw.slice(last, m.index)) + '<bdi dir="ltr">' + esc(m[0]) + "</bdi>";
@@ -146,7 +150,7 @@
     document.documentElement.setAttribute("data-theme", state.theme);
     $("theme-icon").innerHTML = '<use href="#i-' + (state.theme === "dark" ? "sun" : "moon") + '"/>';
     $("theme-btn").title = state.theme === "dark" ? "מצב בהיר" : "מצב כהה";
-    $("meta-theme-color").setAttribute("content", state.theme === "dark" ? "#141210" : "#c2410c");
+    $("meta-theme-color").setAttribute("content", state.theme === "dark" ? "#121417" : "#f7f6f2");
   }
 
   /* ---------- טאבים ומסננים ---------- */
@@ -162,20 +166,13 @@
       }))
       .concat([{ id: "saved", label: "שמורים", n: savedCount() }]);
     $("tabs").innerHTML = items.map(function (it) {
-      return '<button class="tab" role="tab" type="button" data-cat="' + it.id + '" aria-selected="' + (state.category === it.id) + '">' +
-        esc(it.label) + '<span class="n">' + it.n + "</span></button>";
+      return '<button class="tab' + (it.id !== 'all' && it.id !== 'saved' ? ' c-' + it.id : '') + '" role="tab" type="button" data-cat="' + it.id + '" aria-selected="' + (state.category === it.id) + '">' +
+        '<i class="dot"></i>' + esc(it.label) + '<span class="n">' + it.n + "</span></button>";
     }).join("");
   }
 
-  function renderDateSelect() {
-    var keys = Array.from(new Set(TIPS_DATA.map(function (t) { return t.date; }))).sort().reverse();
-    var sel = $("date-select");
-    sel.innerHTML = '<option value="all">כל התאריכים</option>' + keys.map(function (k) {
-      var l = dateLabel(k);
-      var n = TIPS_DATA.filter(function (t) { return t.date === k; }).length;
-      return '<option value="' + k + '">' + esc(l.main + (l.sub ? " · " + l.sub : "")) + " (" + n + ")</option>";
-    }).join("");
-    sel.value = state.date;
+  function renderRangeSelect() {
+    $("range-select").value = String(state.range);
   }
 
   function filtered() {
@@ -184,7 +181,7 @@
       var f = fb(t.id);
       if (state.category === "saved") { if (!(f.favorite || hasReview(f))) return false; }
       else if (state.category !== "all" && t.category !== state.category) return false;
-      if (state.date !== "all" && t.date !== state.date) return false;
+      if (state.range > 0 && dayDiff(latestDate(), t.date) >= state.range) return false;
       if (state.product !== "all" && t.product !== state.product) return false;
       if (q) {
         var hay = [t.titleHe, t.summaryHe, t.originalTitle, t.originalText, t.codeSnippet, t.sourceName, f.note || ""].join(" ").toLowerCase();
@@ -215,9 +212,7 @@
     return '<div class="both"><div><div class="tag-label">עברית</div>' + he + '</div><div><div class="tag-label" dir="ltr">Original</div>' + en + "</div></div>";
   }
 
-  function cardHtml(tip) {
-    var f = fb(tip.id);
-    var mode = state.cardLang[tip.id] || state.lang;
+  function detailHtml(tip, f, mode) {
     var chatOpen = !!state.openChat[tip.id];
     var revOpen = !!state.openReview[tip.id];
     var stars = [1, 2, 3, 4, 5].map(function (s) {
@@ -227,22 +222,18 @@
       return '<button type="button" data-act="tag" data-id="' + tip.id + '" data-tag="' + esc(t) + '" aria-pressed="' + (f.tag === t) + '">' + esc(t) + "</button>";
     }).join("");
     var langBtn = mode === "orig" ? "עברית" : "English";
-
-    return '<article class="card" data-card="' + tip.id + '">' +
-      '<div class="card-body">' +
-        '<div class="meta"><span class="cat">' + esc(catLabel(tip.category)) + "</span><span>·</span><span>" + esc(tip.product) + "</span>" +
-          '<span class="spacer"></span>' +
-          '<button class="chip-btn" type="button" data-act="card-lang" data-id="' + tip.id + '" title="החלפת שפה בכרטיס זה">' + langBtn + "</button>" +
-          '<button class="icon-btn fav" type="button" data-act="fav" data-id="' + tip.id + '" aria-pressed="' + f.favorite + '" aria-label="שמירה במועדפים" title="שמירה במועדפים">' + icon("star", f.favorite ? "filled" : "") + "</button>" +
-        "</div>" +
-        contentHtml(tip, mode) +
-        '<div class="code"><pre dir="' + codeDir(tip.codeSnippet) + '">' + (codeDir(tip.codeSnippet) === "rtl" ? bidi(tip.codeSnippet) : esc(tip.codeSnippet)) + '</pre><button type="button" data-act="copy" data-id="' + tip.id + '">' + icon("copy") + "העתקה</button></div>" +
-        '<div class="card-foot">' +
-          '<span>מקור: <a class="src" href="' + esc(tip.sourceUrl) + '" target="_blank" rel="noopener noreferrer">' + esc(tip.sourceName) + "</a></span>" +
-          '<span class="spacer"></span>' +
-          '<button class="link-btn" type="button" data-act="toggle-chat" data-id="' + tip.id + '" aria-expanded="' + chatOpen + '">' + icon("chat") + "שאל על הטיפ</button>" +
-          '<button class="link-btn" type="button" data-act="toggle-review" data-id="' + tip.id + '" aria-expanded="' + revOpen + '">' + icon("pen") + "חוות דעת" + (hasReview(f) ? " ✓" : "") + "</button>" +
-        "</div>" +
+    return '<div class="fdetail" id="detail-' + tip.id + '">' +
+      '<div class="tools"><span class="spacer"></span>' +
+        '<button class="chip-btn" type="button" data-act="card-lang" data-id="' + tip.id + '" title="החלפת שפה בשורה זו">' + langBtn + "</button>" +
+        '<button class="icon-btn fav" type="button" data-act="fav" data-id="' + tip.id + '" aria-pressed="' + f.favorite + '" aria-label="שמירה במועדפים" title="שמירה במועדפים">' + icon("star", f.favorite ? "filled" : "") + "</button>" +
+      "</div>" +
+      contentHtml(tip, mode) +
+      '<div class="code"><pre dir="' + codeDir(tip.codeSnippet) + '">' + (codeDir(tip.codeSnippet) === "rtl" ? bidi(tip.codeSnippet) : esc(tip.codeSnippet)) + '</pre><button type="button" data-act="copy" data-id="' + tip.id + '">' + icon("copy") + "העתקה</button></div>" +
+      '<div class="card-foot">' +
+        '<span>מקור: <a class="src" href="' + esc(tip.sourceUrl) + '" target="_blank" rel="noopener noreferrer">' + esc(tip.sourceName) + "</a></span>" +
+        '<span class="spacer"></span>' +
+        '<button class="link-btn" type="button" data-act="toggle-chat" data-id="' + tip.id + '" aria-expanded="' + chatOpen + '">' + icon("chat") + "שאל על הטיפ</button>" +
+        '<button class="link-btn" type="button" data-act="toggle-review" data-id="' + tip.id + '" aria-expanded="' + revOpen + '">' + icon("pen") + "חוות דעת" + (hasReview(f) ? " ✓" : "") + "</button>" +
       "</div>" +
       '<div class="panel" data-panel="chat" ' + (chatOpen ? "" : "hidden") + ">" +
         '<div class="hint-row">' +
@@ -261,20 +252,138 @@
         '<div class="row"><input type="text" id="note-' + tip.id + '" value="' + esc(f.note || "") + '" placeholder="מה למדתי, איך ליישם" aria-label="חוות דעת">' +
         '<button class="btn" type="button" data-act="save-note" data-id="' + tip.id + '">שמירה</button></div>' +
       "</div>" +
-    "</article>";
+    "</div>";
+  }
+
+  var LINE_LETTER = { features: "/", agents: "A", skills: "S", github: "G", general: "C" };
+  var LINE_ORDER = ["features", "agents", "skills", "github", "general"];
+  var COL_W = 138;
+
+  function isMobile() { return window.matchMedia("(max-width: 720px)").matches; }
+
+  function latestDate() {
+    return TIPS_DATA.map(function (t) { return t.date; }).sort().pop();
+  }
+
+  function dayDiff(a, b) {
+    return Math.round((new Date(a + "T12:00:00") - new Date(b + "T12:00:00")) / 86400000);
+  }
+
+  function addDays(key, n) {
+    var d = new Date(key + "T12:00:00");
+    d.setDate(d.getDate() + n);
+    return dateKey(d);
+  }
+
+  // כותרת קצרה לתחנה: עד הנקודתיים, הסוגר או המילה "עם"
+  function shortTitle(t) {
+    var s = t.split(/[:(]| עם | בעזרת | באמצעות /)[0].trim();
+    if (s.length < 10) s = t;
+    if (s.length > 40) s = s.slice(0, 38).replace(/\s+\S*$/, "") + "…";
+    return s;
+  }
+
+  function selectedTip(list) {
+    var cur = list.filter(function (t) { return t.id === state.sel; })[0];
+    return cur || null;
+  }
+
+  function dayCells(list) {
+    var latest = latestDate();
+    var earliest = list.length ? list.map(function (t) { return t.date; }).sort()[0] : latest;
+    var span = state.range > 0 ? Math.min(state.range, dayDiff(latest, earliest) + 1) : dayDiff(latest, earliest) + 1;
+    var days = [];
+    for (var i = 0; i < Math.max(span, 1); i++) days.push(addDays(latest, -i));
+    return days;
+  }
+
+  function dateHead(key, i) {
+    var d = new Date(key + "T12:00:00");
+    var wd = d.toLocaleDateString("he-IL", { weekday: "short" });
+    var today = key === dateKey(new Date());
+    return '<span class="mdate' + (today ? " today" : "") + '" style="right:' + (i * COL_W) + "px;width:" + COL_W + 'px"><b>' + d.getDate() + "." + (d.getMonth() + 1) + "</b>" + esc(wd) + "</span>";
+  }
+
+  function detailBox(tip) {
+    var f = fb(tip.id);
+    var mode = state.cardLang[tip.id] || state.lang;
+    return '<div class="kicker">' + esc(catLabel(tip.category)) + " · " + esc(tip.product) + " · " + esc(tip.date) + "</div>" + detailHtml(tip, f, mode);
+  }
+
+  function mapHtml(list, sel) {
+    var days = dayCells(list);
+    var cells = {};
+    list.forEach(function (t) { var k = t.category + "|" + t.date; (cells[k] = cells[k] || []).push(t); });
+    var width = days.length * COL_W;
+    var html = '<div class="mapwrap"><div class="mapscroll" id="mapscroll"><div class="mboard">';
+    html += '<div class="mrow mhead"><div class="mlabel">קווים</div><div class="mtrack" style="width:' + width + 'px">' + days.map(dateHead).join("") + "</div></div>";
+    LINE_ORDER.forEach(function (cat) {
+      var stops = "";
+      days.forEach(function (d, i) {
+        var group = cells[cat + "|" + d] || [];
+        group.forEach(function (t, j) {
+          var k = group.length;
+          var cx = i * COL_W + COL_W / 2 + (j - (k - 1) / 2) * (COL_W / k) * 0.9;
+          var w = k > 1 ? Math.floor(COL_W / k) - 8 : COL_W - 16;
+          var f = fb(t.id);
+          stops += '<div class="stop' + (sel && sel.id === t.id ? " sel" : "") + '" style="right:' + (cx - w / 2) + "px;width:" + w + 'px">' +
+            '<button class="stn' + (f.favorite ? " fav" : "") + '" type="button" data-act="select" data-id="' + t.id + '" aria-pressed="' + (!!sel && sel.id === t.id) + '" aria-label="' + esc(t.titleHe) + '"></button>' +
+            '<span class="slabel">' + bidi(shortTitle(t.titleHe)) + "</span></div>";
+        });
+      });
+      html += '<div class="mrow mline c-' + cat + '"><div class="mlabel"><i class="badge">' + LINE_LETTER[cat] + "</i>" + esc(catLabel(cat)) + "</div>" +
+        '<div class="mtrack" style="width:' + width + 'px"><div class="mbar"></div>' + stops + "</div></div>";
+    });
+    html += "</div></div></div>";
+    return html;
+  }
+
+  function linesHtml(list, sel) {
+    return LINE_ORDER.map(function (cat) {
+      var items = list.filter(function (t) { return t.category === cat; }).sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : (a.id < b.id ? -1 : 1); });
+      if (!items.length) return "";
+      return '<section class="vline c-' + cat + '"><h3><i class="badge">' + LINE_LETTER[cat] + "</i>" + esc(catLabel(cat)) + " <small>" + items.length + "</small></h3><ol>" +
+        items.map(function (t) {
+          var f = fb(t.id);
+          var open = !!sel && sel.id === t.id;
+          var d = new Date(t.date + "T12:00:00");
+          return "<li>" + '<button class="vstn' + (f.favorite ? " fav" : "") + '" type="button" data-act="select" data-id="' + t.id + '" aria-pressed="' + open + '">' +
+            bidi(shortTitle(t.titleHe)) + "<small>" + d.getDate() + "." + (d.getMonth() + 1) + "</small></button>" +
+            (open ? '<div class="vdetail">' + detailBox(t) + "</div>" : "") + "</li>";
+        }).join("") + "</ol></section>";
+    }).join("");
   }
 
   function render() {
+    var scrollY = window.scrollY;
+    var oldScroll = $("mapscroll") ? $("mapscroll").scrollLeft : null;
     renderTabs();
     var list = filtered();
     $("empty").hidden = list.length > 0;
-    var groups = {};
-    list.forEach(function (t) { (groups[t.date] = groups[t.date] || []).push(t); });
-    $("tips").innerHTML = Object.keys(groups).sort().reverse().map(function (k) {
-      var l = dateLabel(k);
-      return '<section class="day"><h2>' + esc(l.main) + (l.sub ? "<small>" + esc(l.sub) + "</small>" : "") + "</h2>" +
-        '<div class="cards">' + groups[k].map(cardHtml).join("") + "</div></section>";
-    }).join("");
+    var mobile = isMobile();
+    var sel = selectedTip(list);
+    if (!sel && !mobile && list.length) {
+      sel = list.slice().sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : (a.id < b.id ? -1 : 1); })[0];
+      state.sel = sel.id;
+    }
+    var out = "";
+    if (list.length) {
+      if (mobile) out = '<div class="vlines">' + linesHtml(list, sel) + "</div>";
+      else {
+        var c = sel ? "c-" + sel.category : "";
+        out = mapHtml(list, sel) + '<div class="mdetail ' + c + '" id="detail-slot"><div class="bar"></div><div class="in">' + (sel ? detailBox(sel) : "") + "</div></div>";
+      }
+    }
+    $("tips").innerHTML = out;
+    if (oldScroll !== null && $("mapscroll")) $("mapscroll").scrollLeft = oldScroll;
+    window.scrollTo(0, scrollY);
+  }
+
+  function scrollDetail() {
+    var el = isMobile() ? document.querySelector(".vdetail") : $("detail-slot");
+    if (!el) return;
+    var r = el.getBoundingClientRect();
+    if (r.bottom > innerHeight || r.top < 120) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
 
   /* ---------- צ'אט ---------- */
@@ -429,7 +538,11 @@
     var id = b.getAttribute("data-id");
     var cur = fb(id);
 
-    if (act === "card-lang") {
+    if (act === "select") {
+      state.sel = state.sel === id && isMobile() ? null : id;
+      render();
+      scrollDetail();
+    } else if (act === "card-lang") {
       var now = state.cardLang[id] || state.lang;
       state.cardLang[id] = now === "orig" ? "he" : "orig";
       render();
@@ -492,12 +605,12 @@
   });
 
   $("search-input").addEventListener("input", function (e) { state.query = e.target.value; render(); });
-  $("date-select").addEventListener("change", function (e) { state.date = e.target.value; render(); });
+  $("range-select").addEventListener("change", function (e) { state.range = parseInt(e.target.value, 10); render(); });
   $("product-select").addEventListener("change", function (e) { state.product = e.target.value; render(); });
 
   $("reset-btn").addEventListener("click", function () {
-    state.category = "all"; state.date = "all"; state.product = "all"; state.query = "";
-    $("search-input").value = ""; $("date-select").value = "all"; $("product-select").value = "all";
+    state.category = "all"; state.range = 14; state.product = "all"; state.query = "";
+    $("search-input").value = ""; $("range-select").value = "14"; $("product-select").value = "all";
     render();
   });
 
@@ -563,8 +676,9 @@
 
   loadState();
   applyTheme();
-  renderDateSelect();
+  renderRangeSelect();
   render();
+  window.matchMedia("(max-width: 720px)").addEventListener("change", function () { render(); });
 
   if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
     // כשגרסה חדשה של האפליקציה מתחלפת, טוענים מחדש פעם אחת כדי להציג את התוכן העדכני
