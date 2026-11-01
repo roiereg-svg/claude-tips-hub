@@ -567,6 +567,11 @@
   render();
 
   if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
-    navigator.serviceWorker.register("sw.js").catch(function () {});
+    // כשגרסה חדשה של האפליקציה מתחלפת, טוענים מחדש פעם אחת כדי להציג את התוכן העדכני
+    var hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener("controllerchange", function () {
+      if (hadController && !window.__reloaded) { window.__reloaded = true; location.reload(); }
+    });
+    navigator.serviceWorker.register("sw.js").then(function (reg) { reg.update(); }).catch(function () {});
   }
 })();
