@@ -1,6 +1,6 @@
 /* service worker: שומר את קבצי האפליקציה כדי שתיפתח גם בלי אינטרנט.
    כשמשנים קבצים, מעלים את מספר הגרסה כאן. */
-const VERSION = "v7";
+const VERSION = "v8";
 const CACHE = "claude-tips-hub-" + VERSION;
 const SHELL = [
   "./",
